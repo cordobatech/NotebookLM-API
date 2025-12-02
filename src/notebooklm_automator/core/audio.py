@@ -4,6 +4,8 @@ import logging
 import time
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
+import requests
+
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
@@ -60,7 +62,8 @@ class AudioManager:
                 select_trigger.click()
                 self.page.wait_for_selector("mat-option", state="visible")
 
-                option = self.page.locator(f"mat-option:has-text('{language}')")
+                option = self.page.locator(
+                    f"mat-option:has-text('{language}')")
                 if option.is_visible():
                     option.click()
                 else:
@@ -73,7 +76,8 @@ class AudioManager:
             )
 
             if not textarea.is_visible():
-                textarea = self.page.locator("mat-dialog-container textarea").last
+                textarea = self.page.locator(
+                    "mat-dialog-container textarea").last
 
             if textarea.is_visible():
                 textarea.fill(prompt)
@@ -223,6 +227,62 @@ class AudioManager:
         except Exception:
             return None
 
+    def download_file(self, url: str) -> Optional[bytes]:
+        """Download the audio file and return its binary content.
+
+        Uses browser cookies to authenticate with Google's servers and
+        follows redirects through multiple domains to fetch the actual
+        audio file.
+
+        Args:
+            url: The direct download URL for the audio file.
+
+        Returns:
+            Binary audio data or None if download failed.
+        """
+        try:
+            # Extract cookies from browser context for authentication
+            browser_cookies = self.page.context.cookies()
+
+            # Use requests.Session with context manager to ensure proper cleanup
+            with requests.Session() as session:
+                for cookie in browser_cookies:
+                    session.cookies.set(
+                        cookie["name"],
+                        cookie["value"],
+                        domain=cookie.get("domain", ""),
+                        path=cookie.get("path", "/"),
+                    )
+
+                headers = {
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/142.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "*/*",
+                    "Accept-Encoding": "gzip, deflate, br",
+                }
+
+                response = session.get(url, headers=headers, timeout=300)
+
+                if not response.ok:
+                    logger.error(
+                        "Failed to download audio: status %s", response.status_code
+                    )
+                    return None
+
+                content_type = response.headers.get("content-type", "")
+                if "audio" not in content_type and "video" not in content_type:
+                    logger.error("Unexpected content type: %s", content_type)
+                    return None
+
+                return response.content
+
+        except requests.RequestException as e:
+            logger.error("Failed to download audio file: %s", e)
+            return None
+
     def clear_studio(self) -> Dict[str, Any]:
         """Delete all generated audio items."""
         removed = 0
@@ -248,7 +308,8 @@ class AudioManager:
             ).first
 
             if more_btn.count() == 0 or not more_btn.is_visible():
-                logger.warning("Could not locate more options for generated item.")
+                logger.warning(
+                    "Could not locate more options for generated item.")
                 break
 
             try:
@@ -262,7 +323,8 @@ class AudioManager:
             ).first
 
             if delete_menu.count() == 0 or not delete_menu.is_visible():
-                logger.warning("Delete option not found in generated item menu.")
+                logger.warning(
+                    "Delete option not found in generated item menu.")
                 break
 
             delete_menu.click()
@@ -285,4 +347,3 @@ class AudioManager:
             self.page.wait_for_timeout(300)
 
         return {"success": removed > 0, "count": removed}
-

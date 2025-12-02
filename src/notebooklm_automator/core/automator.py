@@ -215,6 +215,18 @@ class NotebookLMAutomator:
         self.ensure_connected()
         return self._audio_manager.get_download_url(job_id)
 
+    def download_audio_file(self, url: str) -> Optional[bytes]:
+        """
+        Download the audio file and return its binary content.
+
+        Args:
+            url: The direct download URL for the audio file.
+
+        Returns:
+            Binary audio data or None if download failed.
+        """
+        return self._audio_manager.download_file(url)
+
     def clear_studio(self) -> Dict[str, Any]:
         """
         Delete all generated audio items.

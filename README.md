@@ -16,6 +16,7 @@ Automate Google NotebookLM through a REST API. Upload sources (URLs, YouTube vid
 - **Audio Generation** - Trigger Audio Overview creation with custom styles and prompts
 - **Multiple Styles** - Choose from Deep Dive, Summary, Critique, or Debate formats
 - **Status Tracking** - Monitor generation progress and retrieve download URLs
+- **Binary Download** - Download audio files directly as binary data for automation workflows
 - **Multi-language UI** - Supports English and Hebrew NotebookLM interfaces automatically
 - **Auto Chrome Launch** - Optionally spawns and manages Chrome with remote debugging
 - **Comprehensive Tests** - Unit, API, UI, and E2E test suites included
@@ -202,6 +203,33 @@ GET /audio/file/{job_id}
 ```
 
 Returns the direct download URL for completed audio.
+
+---
+
+### Download Audio File
+
+```http
+GET /audio/download/{job_id}
+```
+
+Downloads the audio file directly as binary data. Useful for automation workflows (e.g., n8n, Zapier) where you need to upload the file to Google Drive, Dropbox, or other services.
+
+**Response:**
+
+- Content-Type: `audio/mp4`
+- Content-Disposition: `attachment; filename=audio_{job_id}.mp4`
+
+**Example (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8000/audio/download/1" -OutFile "podcast.mp4"
+```
+
+**Example (curl):**
+
+```bash
+curl -o podcast.mp4 http://localhost:8000/audio/download/1
+```
 
 ---
 

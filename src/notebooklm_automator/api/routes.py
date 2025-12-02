@@ -3,7 +3,7 @@
 import os
 import subprocess
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from notebooklm_automator.api.models import (
     AudioStatusResponse,
@@ -16,6 +16,7 @@ from notebooklm_automator.api.models import (
     UploadSourcesRequest,
 )
 from notebooklm_automator.core.automator import NotebookLMAutomator
+
 
 router = APIRouter()
 
@@ -132,6 +133,49 @@ def get_audio_download_url(
         )
 
     return {"url": url}
+
+
+@router.get("/audio/download/{job_id}")
+def download_audio_file(
+    job_id: str,
+    automator: NotebookLMAutomator = Depends(get_automator),
+):
+    """Download audio file as binary data.
+
+    Returns the actual audio file content as binary data.
+    """
+    status_data = automator.get_audio_status(job_id)
+
+    if status_data["status"] != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Audio generation not completed or failed",
+        )
+
+    download_url = automator.get_download_url(job_id)
+    if not download_url:
+        automator.page.close()
+        raise HTTPException(
+            status_code=500,
+            detail="Could not retrieve download URL",
+        )
+
+    content = automator.download_audio_file(download_url)
+    automator.page.close()
+
+    if not content:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to download audio file",
+        )
+
+    return Response(
+        content=content,
+        media_type="audio/mp4",
+        headers={
+            "Content-Disposition": f"attachment; filename=audio_{job_id}.mp4"
+        },
+    )
 
 
 @router.post("/studio/clear", response_model=ClearStudioResponse)
