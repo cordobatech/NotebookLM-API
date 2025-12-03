@@ -152,15 +152,8 @@ def download_audio_file(
             detail="Audio generation not completed or failed",
         )
 
-    download_url = automator.get_download_url(job_id)
-    if not download_url:
-        automator.page.close()
-        raise HTTPException(
-            status_code=500,
-            detail="Could not retrieve download URL",
-        )
-
-    content = automator.download_audio_file(download_url)
+    # Download by clicking Download button in UI (uses browser's fast QUIC/HTTP3)
+    content = automator.download_audio_file(job_id)
     automator.page.close()
 
     if not content:

@@ -225,92 +225,118 @@ class AudioManager:
         except Exception:
             return None
 
-    def download_file(self, url: str) -> Optional[bytes]:
-        """Download the audio file and return its binary content.
-
-        Uses curl subprocess with browser cookies for fast, reliable downloads.
-        curl handles HTTP/2, connection reuse, and large files efficiently.
+    def download_file(self, job_id: str) -> Optional[bytes]:
+        """Download audio by clicking the Download button in the UI.
 
         Args:
-            url: The direct download URL for the audio file.
+            job_id: The job ID of the audio to download.
 
         Returns:
             Binary audio data or None if download failed.
         """
-        import subprocess
         import tempfile
         import os
+        import shutil
 
         try:
-            logger.info("Starting download: %s", url[:80])
+            index = int(job_id) - 1
+        except ValueError:
+            logger.error("Invalid job_id: %s", job_id)
+            return None
 
-            # Export cookies to Netscape format for curl
-            browser_cookies = self.page.context.cookies()
+        # Create temp directory for download
+        download_dir = tempfile.mkdtemp(prefix="nlm_download_")
 
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".txt", delete=False
-            ) as cookie_file:
-                cookie_file.write("# Netscape HTTP Cookie File\n")
-                for c in browser_cookies:
-                    domain = c.get("domain", "")
-                    flag = "TRUE" if domain.startswith(".") else "FALSE"
-                    path = c.get("path", "/")
-                    secure = "TRUE" if c.get("secure", False) else "FALSE"
-                    expiry = str(int(c.get("expires", 0)))
-                    cookie_file.write(
-                        f"{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t"
-                        f"{c['name']}\t{c['value']}\n"
-                    )
-                cookie_path = cookie_file.name
+        try:
+            logger.info("Downloading job %s to %s", job_id, download_dir)
 
+            # Set up CDP download behavior on current page
+            cdp = self.page.context.new_cdp_session(self.page)
+            cdp.send("Page.setDownloadBehavior", {
+                "behavior": "allow",
+                "downloadPath": download_dir,
+            })
+
+            # Find the audio item
+            parent = self.page.locator("artifact-library")
+            items = parent.locator(":scope > *")
+            count = items.count()
+
+            if index < 0 or index >= count:
+                logger.error("Job %s not found (count=%d)", job_id, count)
+                return None
+
+            item = items.nth(index)
             try:
-                # Use curl: fast, handles HTTP/2, follows redirects with cookies
-                result = subprocess.run(
-                    [
-                        "curl",
-                        "-sS",              # silent but show errors
-                        "-L",               # follow redirects
-                        "-b", cookie_path,  # use cookies
-                        "--max-time", "180",  # 3 min max
-                        "--connect-timeout", "10",
-                        "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
-                        "-H", "Accept: */*",
-                        url,
-                    ],
-                    capture_output=True,
-                    timeout=200,
-                )
+                item.scroll_into_view_if_needed(timeout=2000)
+            except Exception:
+                pass
 
-                if result.returncode != 0:
-                    stderr = result.stderr.decode("utf-8", errors="replace")
-                    logger.error("curl failed (code %s): %s", result.returncode, stderr)
-                    return None
+            # Click More button
+            more_btn = item.locator(
+                f"button[aria-label='{self._get_text('more_button')}']"
+            ).first
 
-                body = result.stdout
+            if not more_btn.is_visible():
+                logger.error("More button not found")
+                return None
 
-                # Verify we got audio, not HTML error
-                if len(body) < 1000 or body[:15].lower().startswith(b"<!doctype"):
-                    logger.error("Got HTML instead of audio (size=%d)", len(body))
-                    return None
+            more_btn.click()
+            self.page.wait_for_timeout(500)
 
-                logger.info("Download complete: %d bytes", len(body))
-                return body
+            # Click Download menu item
+            download_text = self._get_text("download_menu_item")
+            download_menu = self.page.get_by_role("menuitem", name=download_text).first
 
-            finally:
+            if not download_menu.is_visible():
+                logger.error("Download menu not found")
+                self.page.keyboard.press("Escape")
+                return None
+
+            logger.info("Clicking Download...")
+            download_menu.click()
+
+            # Wait for file to appear
+            logger.info("Waiting for download...")
+            timeout = 120
+            start_time = time.time()
+            downloaded_file = None
+
+            while time.time() - start_time < timeout:
                 try:
-                    os.unlink(cookie_path)
+                    files = os.listdir(download_dir)
+                    for f in files:
+                        if f.endswith(".crdownload") or f.startswith("."):
+                            continue
+                        filepath = os.path.join(download_dir, f)
+                        if os.path.getsize(filepath) > 0:
+                            downloaded_file = filepath
+                            break
                 except Exception:
                     pass
 
-        except subprocess.TimeoutExpired:
-            logger.error("Download timed out")
-            return None
-        except FileNotFoundError:
-            logger.error("curl not found - install curl")
-            return None
+                if downloaded_file:
+                    time.sleep(1)  # Ensure write complete
+                    break
+                time.sleep(0.5)
+
+            if not downloaded_file:
+                files = os.listdir(download_dir) if os.path.exists(download_dir) else []
+                logger.error("Download timed out. Files: %s", files)
+                return None
+
+            with open(downloaded_file, "rb") as f:
+                body = f.read()
+
+            logger.info("Download complete: %d bytes", len(body))
+            return body
+
         except Exception as e:
-            logger.error("Failed to download audio file: %s", e)
+            logger.error("Failed to download: %s", e)
             return None
+
+        finally:
+            shutil.rmtree(download_dir, ignore_errors=True)
 
     def clear_studio(self) -> Dict[str, Any]:
         """Delete all generated audio items."""

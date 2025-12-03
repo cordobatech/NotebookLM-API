@@ -22,6 +22,7 @@ _SELECTORS_BY_KEY: Final[SelectorsByKey] = {
     "url_input_placeholder": {"en": "Paste URLs*", "he": "הדבקת כתובות URL*"},
     "more_button": {"en": "More", "he": "עוד"},
     "delete_menu_item": {"en": "Delete", "he": "מחיקה"},
+    "download_menu_item": {"en": "Download", "he": "הורדה"},
     "confirm_delete_button": {"en": "Delete", "he": "מחיקה"},
     "play_arrow_button": {"en": "Play", "he": "הפעלה"},
     "close_audio_player_button": {"en": "Close audio player", "he": "סגירת נגן האודיו"},
