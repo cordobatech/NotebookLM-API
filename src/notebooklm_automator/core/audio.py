@@ -4,8 +4,6 @@ import logging
 import time
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
-import requests
-
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
@@ -230,9 +228,8 @@ class AudioManager:
     def download_file(self, url: str) -> Optional[bytes]:
         """Download the audio file and return its binary content.
 
-        Uses browser cookies to authenticate with Google's servers and
-        follows redirects through multiple domains to fetch the actual
-        audio file.
+        Uses curl subprocess with browser cookies for fast, reliable downloads.
+        curl handles HTTP/2, connection reuse, and large files efficiently.
 
         Args:
             url: The direct download URL for the audio file.
@@ -240,46 +237,78 @@ class AudioManager:
         Returns:
             Binary audio data or None if download failed.
         """
+        import subprocess
+        import tempfile
+        import os
+
         try:
-            # Extract cookies from browser context for authentication
+            logger.info("Starting download: %s", url[:80])
+
+            # Export cookies to Netscape format for curl
             browser_cookies = self.page.context.cookies()
 
-            # Use requests.Session with context manager to ensure proper cleanup
-            with requests.Session() as session:
-                for cookie in browser_cookies:
-                    session.cookies.set(
-                        cookie["name"],
-                        cookie["value"],
-                        domain=cookie.get("domain", ""),
-                        path=cookie.get("path", "/"),
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False
+            ) as cookie_file:
+                cookie_file.write("# Netscape HTTP Cookie File\n")
+                for c in browser_cookies:
+                    domain = c.get("domain", "")
+                    flag = "TRUE" if domain.startswith(".") else "FALSE"
+                    path = c.get("path", "/")
+                    secure = "TRUE" if c.get("secure", False) else "FALSE"
+                    expiry = str(int(c.get("expires", 0)))
+                    cookie_file.write(
+                        f"{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t"
+                        f"{c['name']}\t{c['value']}\n"
                     )
+                cookie_path = cookie_file.name
 
-                headers = {
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/142.0.0.0 Safari/537.36"
-                    ),
-                    "Accept": "*/*",
-                    "Accept-Encoding": "gzip, deflate, br",
-                }
+            try:
+                # Use curl: fast, handles HTTP/2, follows redirects with cookies
+                result = subprocess.run(
+                    [
+                        "curl",
+                        "-sS",              # silent but show errors
+                        "-L",               # follow redirects
+                        "-b", cookie_path,  # use cookies
+                        "--max-time", "180",  # 3 min max
+                        "--connect-timeout", "10",
+                        "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
+                        "-H", "Accept: */*",
+                        url,
+                    ],
+                    capture_output=True,
+                    timeout=200,
+                )
 
-                response = session.get(url, headers=headers, timeout=300)
-
-                if not response.ok:
-                    logger.error(
-                        "Failed to download audio: status %s", response.status_code
-                    )
+                if result.returncode != 0:
+                    stderr = result.stderr.decode("utf-8", errors="replace")
+                    logger.error("curl failed (code %s): %s", result.returncode, stderr)
                     return None
 
-                content_type = response.headers.get("content-type", "")
-                if "audio" not in content_type and "video" not in content_type:
-                    logger.error("Unexpected content type: %s", content_type)
+                body = result.stdout
+
+                # Verify we got audio, not HTML error
+                if len(body) < 1000 or body[:15].lower().startswith(b"<!doctype"):
+                    logger.error("Got HTML instead of audio (size=%d)", len(body))
                     return None
 
-                return response.content
+                logger.info("Download complete: %d bytes", len(body))
+                return body
 
-        except requests.RequestException as e:
+            finally:
+                try:
+                    os.unlink(cookie_path)
+                except Exception:
+                    pass
+
+        except subprocess.TimeoutExpired:
+            logger.error("Download timed out")
+            return None
+        except FileNotFoundError:
+            logger.error("curl not found - install curl")
+            return None
+        except Exception as e:
             logger.error("Failed to download audio file: %s", e)
             return None
 
