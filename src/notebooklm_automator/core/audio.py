@@ -102,6 +102,24 @@ class AudioManager:
 
         return str(count)
 
+    def _reset_download_behavior(self):
+        """Reset Chrome's download behavior to normal."""
+        try:
+            # Remove any active route handlers
+            self.page.unroute("**/*")
+        except Exception:
+            pass
+
+        try:
+            # Reset download behavior via CDP
+            cdp = self.page.context.new_cdp_session(self.page)
+            cdp.send("Browser.setDownloadBehavior", {
+                "behavior": "allow",
+                "downloadPath": "/tmp/shared-downloads"
+            })
+        except Exception:
+            pass
+
     def get_status(self, job_id: str) -> Dict[str, str]:
         """Check the status of an audio generation job."""
         try:
@@ -280,6 +298,7 @@ class AudioManager:
 
             logger.info("Clicking Download...")
             # Just click - don't use expect_download!
+            self._reset_download_behavior()
             download_menu.click()
 
             # Wait for NEW file to appear in download folder
