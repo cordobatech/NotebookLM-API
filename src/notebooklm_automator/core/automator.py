@@ -236,4 +236,5 @@ class NotebookLMAutomator:
             Dict with 'success', 'count', and optional 'message' keys.
         """
         self.ensure_connected()
+        self._source_manager.close_dialog()
         return self._audio_manager.clear_studio()
