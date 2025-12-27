@@ -66,8 +66,14 @@ class NotebookLMAutomator:
         try:
             if ws_endpoint:
                 # Connect via WebSocket (browserless/chrome)
+                # browserless uses /devtools/browser endpoint for Playwright CDP
+                if not ws_endpoint.endswith("/devtools/browser"):
+                    # Convert ws://host:port to ws://host:port/devtools/browser
+                    ws_endpoint = ws_endpoint.rstrip("/") + "/devtools/browser"
                 logger.info(f"Connecting to browser via WebSocket: {ws_endpoint}")
-                self.browser = self.playwright.chromium.connect(ws_endpoint)
+                self.browser = self.playwright.chromium.connect_over_cdp(
+                    ws_endpoint, timeout=60000
+                )
                 context = self.browser.new_context()
             else:
                 # Connect via CDP (local Chrome)
