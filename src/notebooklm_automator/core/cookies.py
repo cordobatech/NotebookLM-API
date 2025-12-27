@@ -43,10 +43,13 @@ def parse_cookies_txt(file_path: str) -> List[Dict[str, Any]]:
                 domain, _flag, cookie_path, secure, expiration, name, value = parts[:7]
 
                 # Only include Google-related cookies
+                # Include all google.com subdomains (accounts, notebooklm, etc.)
                 if not (
                     "google.com" in domain
-                    or "notebooklm" in domain
+                    or "google." in domain
+                    or "gstatic.com" in domain
                     or "googleapis.com" in domain
+                    or "youtube.com" in domain
                 ):
                     continue
 
