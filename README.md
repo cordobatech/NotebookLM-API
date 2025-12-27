@@ -10,6 +10,8 @@ Automate Google NotebookLM with a small FastAPI service and Playwright. Upload s
 - Track generation status and fetch download URLs or the binary audio file.
 - Handles English and Hebrew NotebookLM interfaces automatically.
 - Can auto-launch Chrome with a dedicated profile or attach to an existing debug session.
+- **Auto-login via cookies.txt** - Import cookies from browser extension for automated login.
+- **Docker support** - Lightweight container that connects to external browserless/chrome.
 
 ---
 
@@ -60,10 +62,52 @@ playwright install chromium
 
 The API serves at `http://localhost:8000` with Swagger UI at `/docs`.
 
-### Docker
+### Auto-Login with Cookies
+
+Instead of manual login, you can use a cookies.txt file exported from your browser:
+
+1. Install Chrome extension "Get cookies.txt LOCALLY"
+2. Visit `notebooklm.google.com` while logged in
+3. Export cookies to `local/cookies/cookies.txt`
+4. Start the server - cookies will be injected automatically
+
 ```bash
-docker build -t notebooklm-podcast-automator .
-docker run -p 8080:8080 -e NOTEBOOKLM_URL="https://notebooklm.google.com/notebook/<YOUR_ID>" notebooklm-podcast-automator
+# Using default cookies location
+uv run run-server --notebook-url "https://..."
+
+# Or specify a custom cookies file
+uv run run-server --notebook-url "https://..." --cookies-file ~/my-cookies.txt
+```
+
+### Docker (with browserless)
+
+The lightweight Docker image connects to an external `browserless/chrome` container:
+
+```bash
+# Using docker-compose (recommended)
+NOTEBOOKLM_URL="https://notebooklm.google.com/notebook/<YOUR_ID>" docker-compose up -d
+
+# Or build and run manually
+docker build -t notebooklm-automator .
+docker run -p 8000:8000 \
+  -e NOTEBOOKLM_URL="https://..." \
+  -e BROWSER_WS_ENDPOINT="ws://browserless:3000" \
+  -v ./local/cookies:/app/local/cookies:ro \
+  notebooklm-automator
+```
+
+To integrate with an existing browserless container (e.g., RSSHub), add to your docker-compose.yml:
+
+```yaml
+notebooklm-automator:
+  build: /path/to/notebooklm-podcast-automator
+  environment:
+    NOTEBOOKLM_URL: "https://notebooklm.google.com/notebook/<ID>"
+    BROWSER_WS_ENDPOINT: "ws://browserless:3000"
+  volumes:
+    - ./cookies:/app/local/cookies:ro
+  depends_on:
+    - browserless
 ```
 
 ---
@@ -79,6 +123,8 @@ All values can come from environment variables or `.env`:
 | `NOTEBOOKLM_CHROME_USER_DATA_DIR` | `~/.notebooklm-chrome` | Profile used to persist your NotebookLM login. |
 | `NOTEBOOKLM_CHROME_PORT` | `9222` | Remote debugging port. |
 | `NOTEBOOKLM_CHROME_HOST` | `127.0.0.1` | Host interface for CDP connection. |
+| `NOTEBOOKLM_COOKIES_FILE` | - | Path to Netscape cookies.txt file for auto-login. |
+| `BROWSER_WS_ENDPOINT` | - | WebSocket endpoint for browserless (e.g., `ws://browserless:3000`). |
 
 Manual Chrome launch (if you set `NOTEBOOKLM_AUTO_LAUNCH_CHROME=0`):
 ```bash

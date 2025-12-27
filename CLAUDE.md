@@ -35,6 +35,7 @@ src/notebooklm_automator/
 ├── core/
 │   ├── automator.py    # NotebookLMAutomator: main orchestrator class
 │   ├── browser.py      # ChromeManager: CDP connection, auto-launch Chrome
+│   ├── cookies.py      # Cookie parsing and injection for auto-login
 │   ├── selectors.py    # Localized UI selectors (en/he) for Playwright
 │   ├── sources.py      # SourceManager: add/clear sources in notebook
 │   └── audio.py        # AudioManager: generate audio, get status, download
@@ -47,6 +48,8 @@ src/notebooklm_automator/
 - **Singleton Automator**: `routes.py` uses a global `_automator_instance` to maintain browser state across API calls
 - **Localization**: `selectors.py` provides `get_selector_by_language()` with fallback to English
 - **CDP Auto-launch**: `ChromeManager.ensure_running()` will start Chrome if `NOTEBOOKLM_AUTO_LAUNCH_CHROME=1`
+- **Dual Connection Mode**: Supports both CDP (local Chrome) and WebSocket (browserless) connections
+- **Cookie Injection**: Auto-login via cookies.txt when Chrome has no existing login state
 
 ### API Endpoints
 
@@ -67,11 +70,25 @@ src/notebooklm_automator/
 | `NOTEBOOKLM_AUTO_LAUNCH_CHROME` | `1` | Auto-start Chrome with CDP |
 | `NOTEBOOKLM_CHROME_PORT` | `9222` | CDP port |
 | `NOTEBOOKLM_CHROME_USER_DATA_DIR` | `~/.notebooklm-chrome` | Chrome profile path |
+| `NOTEBOOKLM_COOKIES_FILE` | - | Path to cookies.txt for auto-login |
+| `BROWSER_WS_ENDPOINT` | - | WebSocket endpoint for browserless (e.g., `ws://browserless:3000`) |
 
 ## Development Notes
 
-- First run requires manual Google login in the Chrome profile
-- Pages close after each API request (`automator.page.close()`) to allow reconnection
+- First run requires manual Google login in the Chrome profile, OR use cookies.txt for auto-login
+- Cookie injection priority: `--cookies-file` arg > `local/cookies/cookies.txt` > manual login
+- If Chrome user data dir already has login state, cookie injection is skipped
+- When using `BROWSER_WS_ENDPOINT`, cookies are always injected (browserless is stateless)
 - Source types: `url`, `youtube`, `text` (URL/YouTube are grouped and pasted together)
 - Job IDs are 1-based indices into the `artifact-library` element
-- Audio download uses filesystem polling in `/tmp/shared-downloads` (configurable via `DOWNLOAD_DIR`)
+
+## Docker Deployment
+
+The project supports lightweight Docker deployment using external browserless/chrome:
+
+```bash
+# Build and run with docker-compose
+NOTEBOOKLM_URL="https://..." docker-compose up -d
+```
+
+The Dockerfile does not bundle Chrome - it connects to an external `browserless/chrome` container via WebSocket, keeping the image small (~200MB vs ~1GB+).
