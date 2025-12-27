@@ -5,7 +5,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
 
+import os
+
 from notebooklm_automator.core.browser import ChromeManager, get_chrome_host
+from notebooklm_automator.core.cookies import get_cookies_from_env, has_chrome_login_state
 from notebooklm_automator.core.selectors import get_selector_by_language
 from notebooklm_automator.core.sources import SourceManager
 from notebooklm_automator.core.audio import AudioManager
@@ -48,10 +51,6 @@ class NotebookLMAutomator:
         if self.page and not self.page.is_closed():
             return
 
-        chrome_host = get_chrome_host()
-        logger.info(f"Connecting to Chrome on {chrome_host}:{self.port}...")
-        self._chrome_manager.ensure_running(chrome_host)
-
         if self.playwright:
             try:
                 self.playwright.stop()
@@ -60,24 +59,53 @@ class NotebookLMAutomator:
             self.playwright = None
 
         self.playwright = sync_playwright().start()
+
+        # Check if using WebSocket endpoint (browserless) or CDP
+        ws_endpoint = os.getenv("BROWSER_WS_ENDPOINT")
+
         try:
-            self.browser = self.playwright.chromium.connect_over_cdp(
-                f"http://{chrome_host}:{self.port}"
-            )
+            if ws_endpoint:
+                # Connect via WebSocket (browserless/chrome)
+                logger.info(f"Connecting to browser via WebSocket: {ws_endpoint}")
+                self.browser = self.playwright.chromium.connect(ws_endpoint)
+                context = self.browser.new_context()
+            else:
+                # Connect via CDP (local Chrome)
+                chrome_host = get_chrome_host()
+                logger.info(f"Connecting to Chrome via CDP on {chrome_host}:{self.port}...")
+                self._chrome_manager.ensure_running(chrome_host)
+                self.browser = self.playwright.chromium.connect_over_cdp(
+                    f"http://{chrome_host}:{self.port}"
+                )
+                context = self.browser.contexts[0]
 
-            context = self.browser.contexts[0]
-
-            # Prefer existing NotebookLM page over creating new one
+            # Prefer existing NotebookLM page over creating new one (CDP mode only)
             existing_page = None
-            for page in context.pages:
-                if "notebooklm.google.com" in page.url:
-                    existing_page = page
-                    break
+            if not ws_endpoint:
+                for page in context.pages:
+                    if "notebooklm.google.com" in page.url:
+                        existing_page = page
+                        break
 
             if existing_page:
                 self.page = existing_page
                 logger.info("Reusing existing NotebookLM page")
             else:
+                # Inject cookies if needed
+                # WebSocket mode: always inject (no persistent state)
+                # CDP mode: only inject if Chrome doesn't have existing login state
+                should_inject = ws_endpoint or not has_chrome_login_state()
+                if should_inject:
+                    cookies = get_cookies_from_env()
+                    if cookies:
+                        try:
+                            context.add_cookies(cookies)
+                            logger.info(f"Injected {len(cookies)} cookies from file")
+                        except Exception as e:
+                            logger.warning(f"Failed to inject cookies: {e}")
+                else:
+                    logger.info("Chrome already has login state, skipping cookie injection")
+
                 self.page = context.new_page()
                 self.page.set_viewport_size({"width": 1280, "height": 800})
                 logger.info(f"Navigating to {self.notebook_url}...")

@@ -9,6 +9,7 @@ def main():
     parser.add_argument("--host", type=str, default="0.0.0.0", help="API server host")
     parser.add_argument("--notebook-url", type=str, help="NotebookLM Notebook URL (overrides NOTEBOOKLM_URL env var)")
     parser.add_argument("--headless", action="store_true", help="Run Chrome in headless mode (no GUI)")
+    parser.add_argument("--cookies-file", type=str, help="Path to cookies.txt file for auto-login (Netscape format)")
 
     args = parser.parse_args()
 
@@ -20,6 +21,9 @@ def main():
 
     if args.headless:
         os.environ["NOTEBOOKLM_HEADLESS"] = "1"
+
+    if args.cookies_file:
+        os.environ["NOTEBOOKLM_COOKIES_FILE"] = args.cookies_file
 
     if not os.getenv("NOTEBOOKLM_URL"):
         print("Error: NOTEBOOKLM_URL environment variable or argument is required.")
