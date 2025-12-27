@@ -54,22 +54,47 @@ def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
         url = page.url if page else "No page"
         title = page.title() if page else "No title"
 
-        # Count audio items
+        # Count audio items with detailed debug info
         audio_count = 0
+        artifact_library_exists = False
+        artifact_library_html = ""
+        debug_info = {}
+
         try:
+            # Check if artifact-library exists
             parent = page.locator("artifact-library")
-            if parent.count() > 0:
+            artifact_library_exists = parent.count() > 0
+
+            if artifact_library_exists:
                 children = parent.locator(":scope > *")
                 audio_count = children.count()
-        except Exception:
-            pass
+                # Get first 500 chars of inner HTML for debugging
+                try:
+                    artifact_library_html = parent.inner_html()[:500]
+                except Exception:
+                    artifact_library_html = "Could not get HTML"
+
+            # Try alternative selectors
+            alt_selectors = {
+                ".artifact-library-container": page.locator(".artifact-library-container").count(),
+                "[class*='artifact']": page.locator("[class*='artifact']").count(),
+                "[class*='audio']": page.locator("[class*='audio']").count(),
+                "mat-icon:has-text('play_arrow')": page.locator("mat-icon:has-text('play_arrow')").count(),
+            }
+            debug_info["alternative_selectors"] = alt_selectors
+
+        except Exception as e:
+            debug_info["selector_error"] = str(e)
 
         return {
             "connected": True,
             "page_url": url,
             "page_title": title,
             "audio_items_count": audio_count,
+            "artifact_library_exists": artifact_library_exists,
+            "artifact_library_html_preview": artifact_library_html,
             "language": automator.lang,
+            "debug_info": debug_info,
         }
     except Exception as e:
         return {
