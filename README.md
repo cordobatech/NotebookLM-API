@@ -1,4 +1,4 @@
-# NotebookLM Podcast Automator
+# NotebookLM-API
 
 Automate Google NotebookLM with a small FastAPI service and Playwright. Upload sources (URLs, YouTube videos, or raw text), generate Audio Overviews, and retrieve the finished files programmatically—no manual clicking through the UI.
 
