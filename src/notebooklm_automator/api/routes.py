@@ -45,6 +45,39 @@ def get_automator() -> NotebookLMAutomator:
     return _automator_instance
 
 
+@router.get("/debug/status")
+def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
+    """Debug endpoint to check current page status."""
+    try:
+        automator.ensure_connected()
+        page = automator.page
+        url = page.url if page else "No page"
+        title = page.title() if page else "No title"
+
+        # Count audio items
+        audio_count = 0
+        try:
+            parent = page.locator("artifact-library")
+            if parent.count() > 0:
+                children = parent.locator(":scope > *")
+                audio_count = children.count()
+        except Exception:
+            pass
+
+        return {
+            "connected": True,
+            "page_url": url,
+            "page_title": title,
+            "audio_items_count": audio_count,
+            "language": automator.lang,
+        }
+    except Exception as e:
+        return {
+            "connected": False,
+            "error": str(e),
+        }
+
+
 @router.post("/sources/upload", response_model=UploadResponse)
 def upload_sources(
     request: UploadSourcesRequest,
