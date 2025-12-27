@@ -61,6 +61,21 @@ def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
         debug_info = {}
 
         try:
+            # Debug: Check if Studio tab exists using different selectors
+            studio_text = automator._get_text("studio_tab")
+            debug_info["studio_tab_text"] = studio_text
+
+            # Check various tab selectors
+            mat_tab = page.locator(f".mat-mdc-tab:has-text('{studio_text}')").first
+            role_tab = page.locator(f"[role='tab']:has-text('{studio_text}')").first
+            text_match = page.get_by_text(studio_text, exact=True).first
+
+            debug_info["studio_tab_selectors"] = {
+                "mat_mdc_tab": mat_tab.count() > 0,
+                "role_tab": role_tab.count() > 0,
+                "text_match": text_match.count() > 0,
+            }
+
             # Ensure we're on Studio tab before checking audio elements
             automator._audio_manager._ensure_studio_tab()
 

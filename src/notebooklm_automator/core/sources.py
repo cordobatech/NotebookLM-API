@@ -41,18 +41,29 @@ class SourceManager:
         """Switch to Sources tab if source elements are not visible (tab mode)."""
         # Check if sources panel is visible
         source_items = self.page.locator("div.single-source-container")
-        add_btn = self.page.locator(
-            f"button:has-text('{self._get_text('add_source_button')}')"
-        ).first
+        add_btn = self.page.get_by_text(self._get_text("add_source_button"), exact=False).first
 
         if source_items.count() > 0 or (add_btn.count() > 0 and add_btn.is_visible()):
             return  # Already in full layout or Sources tab
 
-        # Try to click Sources tab
+        # Try to click Sources tab using Angular Material tab selector
         sources_text = self._get_text("sources_tab")
-        sources_tab = self.page.locator(f"button:has-text('{sources_text}')").first
+        # Priority 1: mat-tab-label with text (Angular Material tabs)
+        sources_tab = self.page.locator(
+            f".mat-mdc-tab:has-text('{sources_text}'), "
+            f".mat-tab-label:has-text('{sources_text}'), "
+            f"[role='tab']:has-text('{sources_text}')"
+        ).first
         if sources_tab.count() > 0 and sources_tab.is_visible():
             logger.info("Switching to Sources tab...")
+            sources_tab.click()
+            self.page.wait_for_timeout(500)
+            return
+
+        # Priority 2: fallback to text matching
+        sources_tab = self.page.get_by_text(sources_text, exact=True).first
+        if sources_tab.count() > 0 and sources_tab.is_visible():
+            logger.info("Switching to Sources tab (text match)...")
             sources_tab.click()
             self.page.wait_for_timeout(500)
 

@@ -23,11 +23,24 @@ class AudioManager:
         if parent.count() > 0:
             return  # Already in full layout or Studio tab
 
-        # Try to click Studio tab
+        # Try to click Studio tab using Angular Material tab selector
         studio_text = self._get_text("studio_tab")
-        studio_tab = self.page.locator(f"button:has-text('{studio_text}')").first
+        # Priority 1: mat-tab-label with text (Angular Material tabs)
+        studio_tab = self.page.locator(
+            f".mat-mdc-tab:has-text('{studio_text}'), "
+            f".mat-tab-label:has-text('{studio_text}'), "
+            f"[role='tab']:has-text('{studio_text}')"
+        ).first
         if studio_tab.count() > 0 and studio_tab.is_visible():
             logger.info("Switching to Studio tab...")
+            studio_tab.click()
+            self.page.wait_for_timeout(500)
+            return
+
+        # Priority 2: fallback to text matching
+        studio_tab = self.page.get_by_text(studio_text, exact=True).first
+        if studio_tab.count() > 0 and studio_tab.is_visible():
+            logger.info("Switching to Studio tab (text match)...")
             studio_tab.click()
             self.page.wait_for_timeout(500)
 
