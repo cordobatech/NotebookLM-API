@@ -76,7 +76,11 @@ class NotebookLMAutomator:
                 )
                 logger.info("Successfully connected to browserless")
 
-                context = self.browser.new_context()
+                # Set viewport size large enough for NotebookLM full layout
+                # (requires width > 1051 for non-tab mode, height > 640 for audio visibility)
+                context = self.browser.new_context(
+                    viewport={"width": 1280, "height": 800}
+                )
             else:
                 # Connect via CDP (local Chrome)
                 chrome_host = get_chrome_host()

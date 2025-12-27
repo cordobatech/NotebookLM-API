@@ -94,6 +94,13 @@ def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
             except Exception:
                 pass
 
+            # Get viewport size for debugging layout issues
+            try:
+                viewport = page.viewport_size
+                debug_info["viewport"] = viewport
+            except Exception:
+                pass
+
         except Exception as e:
             debug_info["selector_error"] = str(e)
 
@@ -115,11 +122,26 @@ def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
 
 
 @router.get("/debug/screenshot")
-def debug_screenshot(automator: NotebookLMAutomator = Depends(get_automator)):
-    """Take a screenshot of current page for debugging."""
+def debug_screenshot(
+    save: bool = False,
+    automator: NotebookLMAutomator = Depends(get_automator),
+):
+    """Take a screenshot of current page for debugging.
+
+    Args:
+        save: If True, save to /app/local/cookies/screenshot.png (viewable on host)
+    """
     try:
         automator.ensure_connected()
         screenshot = automator.page.screenshot(full_page=False)
+
+        if save:
+            # Save to mounted volume for viewing on host
+            save_path = "/app/local/cookies/screenshot.png"
+            with open(save_path, "wb") as f:
+                f.write(screenshot)
+            return {"saved": True, "path": save_path, "size": len(screenshot)}
+
         return Response(
             content=screenshot,
             media_type="image/png",
