@@ -80,8 +80,19 @@ def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
                 "[class*='artifact']": page.locator("[class*='artifact']").count(),
                 "[class*='audio']": page.locator("[class*='audio']").count(),
                 "mat-icon:has-text('play_arrow')": page.locator("mat-icon:has-text('play_arrow')").count(),
+                # Additional selectors for debugging
+                "[class*='studio']": page.locator("[class*='studio']").count(),
+                "[class*='overview']": page.locator("[class*='overview']").count(),
+                "button": page.locator("button").count(),
             }
             debug_info["alternative_selectors"] = alt_selectors
+
+            # Get body text snippet for context
+            try:
+                body_text = page.locator("body").inner_text()[:1000]
+                debug_info["page_text_preview"] = body_text
+            except Exception:
+                pass
 
         except Exception as e:
             debug_info["selector_error"] = str(e)
@@ -101,6 +112,21 @@ def debug_status(automator: NotebookLMAutomator = Depends(get_automator)):
             "connected": False,
             "error": str(e),
         }
+
+
+@router.get("/debug/screenshot")
+def debug_screenshot(automator: NotebookLMAutomator = Depends(get_automator)):
+    """Take a screenshot of current page for debugging."""
+    try:
+        automator.ensure_connected()
+        screenshot = automator.page.screenshot(full_page=False)
+        return Response(
+            content=screenshot,
+            media_type="image/png",
+            headers={"Content-Disposition": "inline; filename=debug.png"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/sources/upload", response_model=UploadResponse)
