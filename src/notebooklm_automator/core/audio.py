@@ -22,6 +22,7 @@ class AudioManager:
         style: Optional[str] = None,
         prompt: Optional[str] = None,
         language: Optional[str] = None,
+        duration: Optional[str] = None,
     ) -> str:
         """Generate an audio overview and return a job ID."""
         edit_icon = self.page.locator(
@@ -66,6 +67,18 @@ class AudioManager:
                     option.click()
                 else:
                     self.page.keyboard.press("Escape")
+
+        if duration:
+            duration_key = f"duration_{duration}"
+            duration_text = self._get_text(duration_key)
+            if duration_text:
+                duration_button = self.page.locator(
+                    f"mat-button-toggle:has-text('{duration_text}')"
+                )
+                if duration_button.count() > 0 and duration_button.is_visible():
+                    duration_button.click()
+                else:
+                    logger.warning(f"Could not find duration button: {duration}")
 
         if prompt:
             placeholder_snippet = self._get_text("prompt_textarea_placeholder")

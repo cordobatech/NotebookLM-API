@@ -56,7 +56,6 @@ def upload_sources(
 
     results = [SourceResult(**r) for r in results_data]
     overall_success = all(r.success for r in results)
-    automator.page.close()
     return UploadResponse(overall_success=overall_success, results=results)
 
 
@@ -64,7 +63,6 @@ def upload_sources(
 def clear_sources(automator: NotebookLMAutomator = Depends(get_automator)):
     """Clear all sources from the notebook."""
     result = automator.clear_sources()
-    automator.page.close()
     return ClearSourcesResponse(
         success=result.get("success", False),
         count=result.get("count", 0),
@@ -83,8 +81,8 @@ def generate_audio(
             style=request.style.value if request.style else None,
             language=request.language,
             prompt=request.prompt,
+            duration=request.duration.value if request.duration else None,
         )
-        automator.page.close()
         return GenerateAudioResponse(job_id=job_id, status="started")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -101,8 +99,6 @@ def check_audio_status(
     download_url = None
     if status_data["status"] == "completed":
         download_url = automator.get_download_url(job_id)
-    else:
-        automator.page.close()
 
     return AudioStatusResponse(
         job_id=job_id,
@@ -125,7 +121,6 @@ def get_audio_download_url(
         )
 
     url = automator.get_download_url(job_id)
-    automator.page.close()
     if not url:
         raise HTTPException(
             status_code=500,
@@ -154,7 +149,6 @@ def download_audio_file(
 
     # Download by clicking Download button in UI (uses browser's fast QUIC/HTTP3)
     result = automator.download_audio_file(job_id)
-    automator.page.close()
 
     if not result:
         raise HTTPException(
@@ -164,14 +158,21 @@ def download_audio_file(
 
     content, file_name, file_size = result
 
-    import re
-    safe_file_name = re.sub(r"[^A-Za-z0-9._-]+", "_", file_name)
+    # Use RFC 5987 encoding for non-ASCII filenames
+    from urllib.parse import quote
+    encoded_filename = quote(file_name, safe='')
+
+    # Provide both ASCII fallback and UTF-8 encoded filename
+    content_disposition = (
+        f"attachment; filename=\"{encoded_filename}\"; "
+        f"filename*=UTF-8''{encoded_filename}"
+    )
 
     return Response(
         content=content,
         media_type="audio/mp4",
         headers={
-            "Content-Disposition": f"attachment; filename={safe_file_name}",
+            "Content-Disposition": content_disposition,
             "Content-Length": str(file_size),
         },
     )
@@ -181,7 +182,6 @@ def download_audio_file(
 def clear_studio(automator: NotebookLMAutomator = Depends(get_automator)):
     """Delete all generated audio items."""
     result = automator.clear_studio()
-    automator.page.close()
     return ClearStudioResponse(
         success=result.get("success", False),
         count=result.get("count", 0),

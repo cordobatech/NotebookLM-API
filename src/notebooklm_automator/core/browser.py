@@ -122,6 +122,12 @@ class ChromeManager:
             "--no-default-browser-check",
         ]
 
+        # Enable headless mode if configured via --headless flag
+        headless = os.getenv("NOTEBOOKLM_HEADLESS", "0").lower()
+        if headless in {"1", "true", "yes"}:
+            launch_args.append("--headless=new")
+            logger.info("Starting Chrome in headless mode")
+
         creationflags = 0
         if os.name == "nt":
             creationflags = subprocess.CREATE_NO_WINDOW

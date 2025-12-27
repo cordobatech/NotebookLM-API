@@ -37,10 +37,16 @@ class AudioStyle(str, Enum):
     DEBATE = "debate"
 
 
+class AudioDuration(str, Enum):
+    SHORT = "short"
+    DEFAULT = "default"
+
+
 class GenerateAudioRequest(BaseModel):
     style: Optional[AudioStyle] = None
     prompt: Optional[str] = None
     language: Optional[str] = None
+    duration: Optional[AudioDuration] = None
 
 
 class GenerateAudioResponse(BaseModel):

@@ -66,15 +66,26 @@ class NotebookLMAutomator:
             )
 
             context = self.browser.contexts[0]
-            self.page = context.new_page()
-            self.page.set_viewport_size({"width": 1280, "height": 800})
 
-            logger.info(f"Navigating to {self.notebook_url}...")
-            self.page.goto(self.notebook_url, timeout=10000)
-            try:
-                self.page.wait_for_load_state("networkidle", timeout=10000)
-            except PlaywrightError:
-                logger.warning("Network idle timeout, continuing anyway...")
+            # Prefer existing NotebookLM page over creating new one
+            existing_page = None
+            for page in context.pages:
+                if "notebooklm.google.com" in page.url:
+                    existing_page = page
+                    break
+
+            if existing_page:
+                self.page = existing_page
+                logger.info("Reusing existing NotebookLM page")
+            else:
+                self.page = context.new_page()
+                self.page.set_viewport_size({"width": 1280, "height": 800})
+                logger.info(f"Navigating to {self.notebook_url}...")
+                self.page.goto(self.notebook_url, timeout=10000)
+                try:
+                    self.page.wait_for_load_state("networkidle", timeout=10000)
+                except PlaywrightError:
+                    logger.warning("Network idle timeout, continuing anyway...")
 
             self._detect_language()
             self._init_managers()
@@ -130,6 +141,8 @@ class NotebookLMAutomator:
             if lang_attr:
                 if lang_attr.startswith("he") or lang_attr.startswith("iw"):
                     self.lang = "he"
+                elif lang_attr.startswith("zh"):
+                    self.lang = "zh"
                 elif lang_attr.startswith("ja"):
                     self.lang = "ja"
                 else:
@@ -174,6 +187,7 @@ class NotebookLMAutomator:
         style: Optional[str] = None,
         prompt: Optional[str] = None,
         language: Optional[str] = None,
+        duration: Optional[str] = None,
     ) -> str:
         """
         Generate an audio overview.
@@ -182,12 +196,13 @@ class NotebookLMAutomator:
             style: Optional style for the audio (e.g., 'deep_dive', 'summary').
             prompt: Optional prompt text for customization.
             language: Optional language selection.
+            duration: Optional duration selection ('short' or 'default').
 
         Returns:
             Job ID string for tracking the generation.
         """
         self.ensure_connected()
-        return self._audio_manager.generate(style, prompt, language)
+        return self._audio_manager.generate(style, prompt, language, duration)
 
     def get_audio_status(self, job_id: str) -> Dict[str, str]:
         """
