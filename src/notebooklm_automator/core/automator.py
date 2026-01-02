@@ -143,6 +143,9 @@ class NotebookLMAutomator:
                 except PlaywrightError:
                     logger.warning("Network idle timeout, continuing anyway...")
 
+                # Handle Google account chooser if present
+                self._handle_account_chooser()
+
             self._detect_language()
             self._init_managers()
             logger.info(f"Connected. Detected language: {self.lang}")
@@ -214,6 +217,67 @@ class NotebookLMAutomator:
         self._source_manager = None
         self._audio_manager = None
         self._chrome_manager.terminate()
+
+    def _handle_account_chooser(self) -> None:
+        """Handle Google account chooser page if present."""
+        try:
+            # Check if we're on an account chooser page
+            if "accounts.google.com" not in self.page.url:
+                return
+
+            # Look for "Choose an account" text or similar
+            choose_account = self.page.locator("text=Choose an account")
+            if choose_account.count() == 0:
+                return
+
+            logger.info("Account chooser detected, selecting account...")
+
+            # Get preferred account from env var
+            preferred_account = os.getenv("GOOGLE_ACCOUNT_EMAIL")
+
+            if preferred_account:
+                # Click on the account with matching email
+                account_item = self.page.locator(
+                    f"[data-email='{preferred_account}'], "
+                    f"li:has-text('{preferred_account}'), "
+                    f"div[data-identifier='{preferred_account}']"
+                ).first
+                if account_item.count() > 0:
+                    logger.info(f"Selecting account: {preferred_account}")
+                    account_item.click()
+                else:
+                    # Fallback: try text matching
+                    account_item = self.page.get_by_text(preferred_account).first
+                    if account_item.count() > 0:
+                        account_item.click()
+                    else:
+                        logger.warning(
+                            f"Account {preferred_account} not found in chooser"
+                        )
+                        return
+            else:
+                # No preferred account, click the first available account
+                first_account = self.page.locator(
+                    "ul li[role='link'], div[data-identifier]"
+                ).first
+                if first_account.count() > 0:
+                    logger.info("No preferred account set, selecting first account")
+                    first_account.click()
+                else:
+                    logger.warning("No accounts found in chooser")
+                    return
+
+            # Wait for navigation after account selection
+            self.page.wait_for_timeout(2000)
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except PlaywrightError:
+                pass
+
+            logger.info(f"Account selected, now at: {self.page.url}")
+
+        except Exception as e:
+            logger.warning(f"Failed to handle account chooser: {e}")
 
     def _detect_language(self) -> None:
         """Detect the UI language from the page."""

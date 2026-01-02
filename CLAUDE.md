@@ -75,6 +75,7 @@ src/notebooklm_automator/
 | `NOTEBOOKLM_STORAGE_STATE` | - | Path to storage_state.json (preferred over cookies.txt) |
 | `COOKIECLOUD_FILE` | - | Path to CookieCloud cookie.json file |
 | `BROWSER_WS_ENDPOINT` | - | WebSocket endpoint for browserless (e.g., `ws://browserless:3000`) |
+| `GOOGLE_ACCOUNT_EMAIL` | - | Email to auto-select when Google shows account chooser |
 
 ## Development Notes
 
