@@ -246,11 +246,16 @@ def parse_cookiecloud_json(file_path: str) -> List[Dict[str, Any]]:
                     cookie["expires"] = int(exp_date)
 
                 # Handle sameSite
+                # CookieCloud uses: "strict", "lax", "no_restriction", "unspecified"
+                # Playwright expects: "Strict", "Lax", "None"
                 same_site = cc_cookie.get("sameSite", "").lower()
-                if same_site in ("strict", "lax", "none"):
-                    cookie["sameSite"] = same_site.capitalize()
-                    if same_site == "none":
-                        cookie["sameSite"] = "None"
+                if same_site == "strict":
+                    cookie["sameSite"] = "Strict"
+                elif same_site == "lax":
+                    cookie["sameSite"] = "Lax"
+                elif same_site in ("none", "no_restriction"):
+                    cookie["sameSite"] = "None"
+                # "unspecified" -> don't set sameSite (browser default)
 
                 cookies.append(cookie)
 
@@ -423,18 +428,20 @@ def get_auth_state() -> Optional[Union[str, Dict[str, Any]]]:
     # Priority 1: existing storage state file
     storage_path = find_storage_state()
     if storage_path:
+        logger.info(f"Auth source: storage_state.json ({storage_path})")
         return storage_path
 
     # Priority 2: CookieCloud JSON file
     cookies = get_cookies_from_cookiecloud()
     if cookies:
-        logger.info("Converting CookieCloud cookies to storage state format")
+        logger.info(f"Auth source: cookie.json (CookieCloud) - {len(cookies)} cookies")
         return cookies_to_storage_state(cookies)
 
     # Priority 3: convert cookies.txt to storage state
     cookies = get_cookies_from_env()
     if cookies:
-        logger.info("Converting cookies.txt to storage state format")
+        logger.info(f"Auth source: cookies.txt - {len(cookies)} cookies")
         return cookies_to_storage_state(cookies)
 
+    logger.warning("No auth source found (storage_state.json, cookie.json, or cookies.txt)")
     return None
