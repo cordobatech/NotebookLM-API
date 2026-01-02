@@ -342,6 +342,40 @@ def clear_studio(automator: NotebookLMAutomator = Depends(get_automator)):
     )
 
 
+@router.post("/auth/save")
+def save_login_state(automator: NotebookLMAutomator = Depends(get_automator)):
+    """Save current browser login state to storage_state.json.
+
+    This captures cookies and localStorage from the current browser session.
+    The saved state can be reused in future sessions to maintain login,
+    which is more reliable than cookies.txt for browserless mode.
+
+    The file is saved to: local/cookies/storage_state.json
+
+    Usage:
+    1. First login successfully (via cookies.txt or manual login)
+    2. Call this endpoint to save the login state
+    3. Future sessions will use storage_state.json automatically
+    """
+    try:
+        automator.ensure_connected()
+        success = automator.save_login_state()
+
+        if success:
+            return {
+                "success": True,
+                "message": "Login state saved to storage_state.json",
+                "path": "local/cookies/storage_state.json",
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save login state",
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Test type to directory mapping
 TEST_PATHS = {
     "unit": "tests/unit/",

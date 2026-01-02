@@ -8,7 +8,11 @@ from playwright.sync_api import sync_playwright, Error as PlaywrightError
 import os
 
 from notebooklm_automator.core.browser import ChromeManager, get_chrome_host
-from notebooklm_automator.core.cookies import get_cookies_from_env, has_chrome_login_state
+from notebooklm_automator.core.cookies import (
+    get_auth_state,
+    has_chrome_login_state,
+    save_storage_state,
+)
 from notebooklm_automator.core.selectors import get_selector_by_language
 from notebooklm_automator.core.sources import SourceManager
 from notebooklm_automator.core.audio import AudioManager
@@ -103,20 +107,32 @@ class NotebookLMAutomator:
                 self.page = existing_page
                 logger.info("Reusing existing NotebookLM page")
             else:
-                # Inject cookies if needed
-                # WebSocket mode: always inject (no persistent state)
+                # Inject auth state if needed
+                # WebSocket mode: always inject (browserless has no persistent state)
                 # CDP mode: only inject if Chrome doesn't have existing login state
                 should_inject = ws_endpoint or not has_chrome_login_state()
                 if should_inject:
-                    cookies = get_cookies_from_env()
-                    if cookies:
+                    auth_state = get_auth_state()
+                    if auth_state:
                         try:
-                            context.add_cookies(cookies)
-                            logger.info(f"Injected {len(cookies)} cookies from file")
+                            # auth_state can be a file path (str) or dict
+                            if isinstance(auth_state, str):
+                                # Load from file path
+                                import json
+                                with open(auth_state, "r") as f:
+                                    state = json.load(f)
+                            else:
+                                state = auth_state
+
+                            # Add cookies from storage state
+                            cookies = state.get("cookies", [])
+                            if cookies:
+                                context.add_cookies(cookies)
+                                logger.info(f"Injected {len(cookies)} cookies from storage state")
                         except Exception as e:
-                            logger.warning(f"Failed to inject cookies: {e}")
+                            logger.warning(f"Failed to inject auth state: {e}")
                 else:
-                    logger.info("Chrome already has login state, skipping cookie injection")
+                    logger.info("Chrome already has login state, skipping injection")
 
                 self.page = context.new_page()
                 self.page.set_viewport_size({"width": 1280, "height": 800})
@@ -146,6 +162,31 @@ class NotebookLMAutomator:
         except Exception:
             logger.info("Connection lost, reconnecting...")
             self.connect()
+
+    def save_login_state(self, path: Optional[str] = None) -> bool:
+        """
+        Save current browser login state to storage_state.json.
+
+        This captures cookies and localStorage, which can be reused
+        in future sessions to avoid re-login.
+
+        Args:
+            path: Optional path to save to (defaults to local/cookies/storage_state.json)
+
+        Returns:
+            True if saved successfully, False otherwise.
+        """
+        if not self.page or self.page.is_closed():
+            logger.error("Cannot save login state: no active page")
+            return False
+
+        try:
+            context = self.page.context
+            state = context.storage_state()
+            return save_storage_state(state, path)
+        except Exception as e:
+            logger.error(f"Failed to save login state: {e}")
+            return False
 
     def close(self) -> None:
         """Close the connection and clean up resources."""

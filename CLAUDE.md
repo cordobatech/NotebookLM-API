@@ -35,7 +35,7 @@ src/notebooklm_automator/
 ├── core/
 │   ├── automator.py    # NotebookLMAutomator: main orchestrator class
 │   ├── browser.py      # ChromeManager: CDP connection, auto-launch Chrome
-│   ├── cookies.py      # Cookie parsing and injection for auto-login
+│   ├── cookies.py      # Cookie/storageState parsing for auto-login
 │   ├── selectors.py    # Localized UI selectors (en/he) for Playwright
 │   ├── sources.py      # SourceManager: add/clear sources in notebook
 │   └── audio.py        # AudioManager: generate audio, get status, download
@@ -49,7 +49,7 @@ src/notebooklm_automator/
 - **Localization**: `selectors.py` provides `get_selector_by_language()` with fallback to English
 - **CDP Auto-launch**: `ChromeManager.ensure_running()` will start Chrome if `NOTEBOOKLM_AUTO_LAUNCH_CHROME=1`
 - **Dual Connection Mode**: Supports both CDP (local Chrome) and WebSocket (browserless) connections
-- **Cookie Injection**: Auto-login via cookies.txt when Chrome has no existing login state
+- **StorageState Auth**: Auto-login via storage_state.json (preferred) or cookies.txt
 
 ### API Endpoints
 
@@ -58,9 +58,10 @@ src/notebooklm_automator/
 | POST | `/sources/upload` | Upload URL/YouTube/text sources |
 | POST | `/sources/clear` | Remove all sources |
 | POST | `/audio/generate` | Start audio generation (returns job_id) |
-| GET | `/audio/status/{job_id}` | Check generation status |
+| GET | `/audio/status/{job_id}` | Check generation status (includes title) |
 | GET | `/audio/download/{job_id}` | Download audio binary |
 | POST | `/studio/clear` | Delete all generated audio |
+| POST | `/auth/save` | Save login state to storage_state.json |
 
 ## Environment Variables
 
@@ -71,14 +72,17 @@ src/notebooklm_automator/
 | `NOTEBOOKLM_CHROME_PORT` | `9222` | CDP port |
 | `NOTEBOOKLM_CHROME_USER_DATA_DIR` | `~/.notebooklm-chrome` | Chrome profile path |
 | `NOTEBOOKLM_COOKIES_FILE` | - | Path to cookies.txt for auto-login |
+| `NOTEBOOKLM_STORAGE_STATE` | - | Path to storage_state.json (preferred over cookies.txt) |
+| `COOKIECLOUD_FILE` | - | Path to CookieCloud cookie.json file |
 | `BROWSER_WS_ENDPOINT` | - | WebSocket endpoint for browserless (e.g., `ws://browserless:3000`) |
 
 ## Development Notes
 
-- First run requires manual Google login in the Chrome profile, OR use cookies.txt for auto-login
-- Cookie injection priority: `--cookies-file` arg > `local/cookies/cookies.txt` > manual login
-- If Chrome user data dir already has login state, cookie injection is skipped
-- When using `BROWSER_WS_ENDPOINT`, cookies are always injected (browserless is stateless)
+- First run requires manual Google login in the Chrome profile, OR use cookie files for auto-login
+- Auth injection priority: `storage_state.json` > `cookie.json` (CookieCloud) > `cookies.txt` > manual login
+- After successful login, call `POST /auth/save` to save state for future sessions
+- If Chrome user data dir already has login state, auth injection is skipped
+- When using `BROWSER_WS_ENDPOINT`, auth is always injected (browserless is stateless)
 - Source types: `url`, `youtube`, `text` (URL/YouTube are grouped and pasted together)
 - Job IDs are 1-based indices into the `artifact-library` element
 
