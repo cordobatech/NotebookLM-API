@@ -342,6 +342,22 @@ def clear_studio(automator: NotebookLMAutomator = Depends(get_automator)):
     )
 
 
+@router.post("/page/refresh")
+def refresh_page(automator: NotebookLMAutomator = Depends(get_automator)):
+    """Refresh the current page to get latest status.
+
+    Useful when the page state might be stale (e.g., after system sleep).
+    """
+    try:
+        automator.ensure_connected()
+        automator.page.reload(wait_until="domcontentloaded", timeout=30000)
+        # Wait for page to stabilize
+        automator.page.wait_for_timeout(2000)
+        return {"success": True, "message": "Page refreshed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/auth/save")
 def save_login_state(automator: NotebookLMAutomator = Depends(get_automator)):
     """Save current browser login state to storage_state.json.
