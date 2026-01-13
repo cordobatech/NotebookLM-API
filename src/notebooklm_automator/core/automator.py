@@ -137,9 +137,9 @@ class NotebookLMAutomator:
                 self.page = context.new_page()
                 self.page.set_viewport_size({"width": 1280, "height": 800})
                 logger.info(f"Navigating to {self.notebook_url}...")
-                self.page.goto(self.notebook_url, timeout=10000)
+                self.page.goto(self.notebook_url, timeout=60000)
                 try:
-                    self.page.wait_for_load_state("networkidle", timeout=10000)
+                    self.page.wait_for_load_state("networkidle", timeout=30000)
                 except PlaywrightError:
                     logger.warning("Network idle timeout, continuing anyway...")
 
