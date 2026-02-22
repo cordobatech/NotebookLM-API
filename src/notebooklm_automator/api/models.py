@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SourceType(str, Enum):
@@ -72,3 +72,25 @@ class ClearStudioResponse(BaseModel):
     success: bool
     count: int
     message: Optional[str] = None
+
+
+class GenerateVideoRequest(BaseModel):
+    language: Optional[str] = Field(
+        None,
+        description="Language for the video narration (e.g. 'Español (Latinoamérica)')",
+    )
+    prompt: Optional[str] = Field(
+        None,
+        description="Optional customization prompt for the video",
+    )
+
+
+class GenerateVideoResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class VideoStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    title: Optional[str] = None
