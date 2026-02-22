@@ -169,6 +169,48 @@ def debug_screenshot(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@router.get("/debug/studio-video-html")
+def debug_studio_video_html(automator: NotebookLMAutomator = Depends(get_automator)):
+    """Dump Studio panel HTML to discover video selectors.
+
+    Navigate to the Studio tab and return the full innerHTML so we can
+    map the real CSS selectors for video generation.
+    """
+    try:
+        automator.ensure_connected()
+        page = automator.page
+
+        # Switch to Studio tab using the same helper audio uses
+        automator._audio_manager._ensure_studio_tab()
+        page.wait_for_timeout(2000)
+
+        # Dump artifact-library or entire studio panel
+        studio_html = ""
+        artifact_lib = page.locator("artifact-library")
+        if artifact_lib.count() > 0:
+            studio_html = artifact_lib.inner_html()
+        else:
+            # Fallback: dump entire body (truncated)
+            studio_html = page.locator("body").inner_html()[:5000]
+
+        # Also capture all button texts visible on page
+        buttons = page.locator("button").all()
+        button_texts = [b.inner_text().strip() for b in buttons if b.inner_text().strip()]
+
+        # Capture all role=tab texts
+        tabs = page.locator("[role='tab']").all()
+        tab_texts = [t.inner_text().strip() for t in tabs if t.inner_text().strip()]
+
+        return {
+            "studio_html": studio_html,
+            "button_texts": button_texts,
+            "tab_texts": tab_texts,
+            "page_url": page.url,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/sources/upload", response_model=UploadResponse)
 def upload_sources(
     request: UploadSourcesRequest,
