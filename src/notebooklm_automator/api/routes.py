@@ -11,9 +11,12 @@ from notebooklm_automator.api.models import (
     ClearStudioResponse,
     GenerateAudioRequest,
     GenerateAudioResponse,
+    GenerateVideoRequest,
+    GenerateVideoResponse,
     SourceResult,
     UploadResponse,
     UploadSourcesRequest,
+    VideoStatusResponse,
 )
 from notebooklm_automator.core.automator import NotebookLMAutomator
 
@@ -381,6 +384,75 @@ def clear_studio(automator: NotebookLMAutomator = Depends(get_automator)):
         success=result.get("success", False),
         count=result.get("count", 0),
         message=result.get("message"),
+    )
+
+
+@router.post("/video/generate", response_model=GenerateVideoResponse)
+def generate_video(
+    request: GenerateVideoRequest,
+    automator: NotebookLMAutomator = Depends(get_automator),
+):
+    """Trigger video overview generation."""
+    try:
+        job_id = automator.generate_video(
+            language=request.language,
+            prompt=request.prompt,
+        )
+        return GenerateVideoResponse(job_id=job_id, status="started")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/video/status/{job_id}", response_model=VideoStatusResponse)
+def check_video_status(
+    job_id: str,
+    automator: NotebookLMAutomator = Depends(get_automator),
+):
+    """Check the status of a video generation job."""
+    status_data = automator.get_video_status(job_id)
+    return VideoStatusResponse(
+        job_id=job_id,
+        status=status_data["status"],
+        title=status_data.get("title"),
+    )
+
+
+@router.get("/video/download/{job_id}")
+def download_video_file(
+    job_id: str,
+    automator: NotebookLMAutomator = Depends(get_automator),
+):
+    """Download the generated video as an MP4 binary."""
+    from urllib.parse import quote
+
+    status_data = automator.get_video_status(job_id)
+    if status_data["status"] != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Video generation not completed or failed",
+        )
+
+    result = automator.download_video_file(job_id)
+    if not result:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to download video file",
+        )
+
+    content, file_name, file_size = result
+    encoded_filename = quote(file_name, safe="")
+    content_disposition = (
+        f'attachment; filename="{encoded_filename}"; '
+        f"filename*=UTF-8''{encoded_filename}"
+    )
+
+    return Response(
+        content=content,
+        media_type="video/mp4",
+        headers={
+            "Content-Disposition": content_disposition,
+            "Content-Length": str(file_size),
+        },
     )
 
 
