@@ -173,6 +173,39 @@ def debug_screenshot(
 
 
 
+@router.get("/debug/studio-full")
+def debug_studio_full(automator: NotebookLMAutomator = Depends(get_automator)):
+    """Dump the full Studio panel HTML including generation cards."""
+    try:
+        automator.ensure_connected()
+        page = automator.page
+        automator._audio_manager._ensure_studio_tab()
+        page.wait_for_timeout(2000)
+
+        # Dump the full studio column (right sidebar)
+        studio_col = page.locator("[class*='studio']").first
+        studio_html = studio_col.inner_html() if studio_col.count() > 0 else ""
+
+        # All clickable elements (button + role=button + mat-card-like)
+        clickables = page.locator("button, [role='button'], [tabindex='0']").all()
+        clickable_texts = []
+        for el in clickables:
+            try:
+                txt = el.inner_text().strip()
+                aria = el.get_attribute("aria-label") or ""
+                if txt or aria:
+                    clickable_texts.append({"text": txt[:80], "aria": aria[:80]})
+            except Exception:
+                pass
+
+        return {
+            "studio_col_html": studio_html[:8000],
+            "clickable_texts": clickable_texts,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/debug/studio-video-html")
 def debug_studio_video_html(automator: NotebookLMAutomator = Depends(get_automator)):
     """Dump Studio panel HTML to discover video selectors.
