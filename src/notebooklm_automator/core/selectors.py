@@ -31,6 +31,7 @@ _SELECTORS_BY_KEY: Final[SelectorsByKey] = {
     "video_confirm_button": {"en": "Generate", "he": "Generate", "zh": "Generate"},
     "video_downloading": {"en": "Downloading", "he": "Downloading", "zh": "Downloading"},
     "video_ready": {"en": "Download", "he": "Download", "zh": "Download"},
+    "video_download_menu_item": {"en": "Download", "he": "Download", "zh": "Download"},
     "error_text": {"en": "Error", "he": "שגיאה", "zh": "错误"},
     "generating_status_text": {"en": "Generating", "he": "בתהליך יצירה", "zh": "正在生成"},
     "delete_source_menu_item": {"en": "Remove source", "he": "הסרת המקור", "zh": "移除来源"},

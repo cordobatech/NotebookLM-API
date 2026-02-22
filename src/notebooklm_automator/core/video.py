@@ -139,7 +139,7 @@ class VideoManager:
             self._page.wait_for_timeout(500)
 
             # Click "Download" in the menu
-            download_text = self._get_text("video_ready")
+            download_text = self._get_text("video_download_menu_item")
             dl_option = self._page.locator(
                 f"[role='menuitem']:has-text('{download_text}'), "
                 f"button:has-text('{download_text}')"
@@ -172,12 +172,13 @@ class VideoManager:
         """Switch to the Studio tab if not already active."""
         try:
             studio_text = self._get_text("studio_tab")
-            tab = self._page.locator(
+            tab_locator = self._page.locator(
                 f".mat-mdc-tab:has-text('{studio_text}'), "
                 f"[role='tab']:has-text('{studio_text}')"
-            ).first
-            if tab.count() == 0:
+            )
+            if tab_locator.count() == 0:
                 return
+            tab = tab_locator.first
             aria = tab.get_attribute("aria-selected")
             if aria != "true":
                 tab.click()
@@ -189,14 +190,15 @@ class VideoManager:
         """Select language in the video generation dialog."""
         try:
             lang_text = self._get_text("video_language_button")
-            lang_btn = self._page.locator(
+            lang_locator = self._page.locator(
                 f"[aria-label*='language' i], "
                 f"mat-select[aria-label*='language' i], "
                 f"button:has-text('{lang_text}')"
-            ).first
-            if lang_btn.count() == 0:
+            )
+            if lang_locator.count() == 0:
                 logger.warning("Language selector not found, skipping")
                 return
+            lang_btn = lang_locator.first
             lang_btn.click()
             self._page.wait_for_timeout(500)
             option = self._page.locator(
@@ -212,13 +214,14 @@ class VideoManager:
     def _fill_prompt(self, prompt: str) -> None:
         """Fill the prompt field in the video generation dialog if present."""
         try:
-            field = self._page.locator(
+            field_locator = self._page.locator(
                 "textarea[placeholder*='prompt' i], "
                 "input[placeholder*='prompt' i]"
-            ).first
-            if field.count() == 0:
+            )
+            if field_locator.count() == 0:
                 logger.warning("Prompt field not found, skipping")
                 return
+            field = field_locator.first
             field.fill(prompt)
             logger.info("Filled prompt field")
         except Exception as e:
