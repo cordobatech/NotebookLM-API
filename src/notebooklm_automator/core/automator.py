@@ -16,6 +16,7 @@ from notebooklm_automator.core.cookies import (
 from notebooklm_automator.core.selectors import get_selector_by_language
 from notebooklm_automator.core.sources import SourceManager
 from notebooklm_automator.core.audio import AudioManager
+from notebooklm_automator.core.video import VideoManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,6 +50,7 @@ class NotebookLMAutomator:
         self._chrome_manager = ChromeManager(port)
         self._source_manager: Optional[SourceManager] = None
         self._audio_manager: Optional[AudioManager] = None
+        self._video_manager: Optional[VideoManager] = None
 
     def connect(self) -> None:
         """Connect to the browser and navigate to the notebook."""
@@ -216,6 +218,7 @@ class NotebookLMAutomator:
         self.playwright = None
         self._source_manager = None
         self._audio_manager = None
+        self._video_manager = None
         self._chrome_manager.terminate()
 
     def _handle_account_chooser(self) -> None:
@@ -306,6 +309,7 @@ class NotebookLMAutomator:
         """Initialize source and audio managers after page is ready."""
         self._source_manager = SourceManager(self.page, self._get_text)
         self._audio_manager = AudioManager(self.page, self._get_text)
+        self._video_manager = VideoManager(self.page, self._get_text)
 
     def add_sources(self, sources: List[Dict[str, str]]) -> List[Dict[str, Any]]:
         """
@@ -401,3 +405,44 @@ class NotebookLMAutomator:
         self.ensure_connected()
         self._source_manager.close_dialog()
         return self._audio_manager.clear_studio()
+
+    def generate_video(
+        self,
+        language: Optional[str] = None,
+        prompt: Optional[str] = None,
+    ) -> str:
+        """Trigger a Video Overview generation.
+
+        Args:
+            language: Optional language string (e.g. "Spanish (Latin America)").
+            prompt: Optional prompt text.
+
+        Returns:
+            Job ID string for tracking.
+        """
+        self.ensure_connected()
+        return self._video_manager.generate(language=language, prompt=prompt)
+
+    def get_video_status(self, job_id: str) -> Dict[str, str]:
+        """Check the status of a video generation job.
+
+        Args:
+            job_id: The job ID returned from generate_video.
+
+        Returns:
+            Dict with 'status' key (generating, completed, failed, unknown).
+        """
+        self.ensure_connected()
+        return self._video_manager.get_status(job_id)
+
+    def download_video_file(self, job_id: str) -> Optional[Tuple[bytes, str, int]]:
+        """Download the video file by clicking Download in the UI.
+
+        Args:
+            job_id: The job ID of the video to download.
+
+        Returns:
+            Tuple of (file_content, file_name, file_size) or None if failed.
+        """
+        self.ensure_connected()
+        return self._video_manager.download_file(job_id)
