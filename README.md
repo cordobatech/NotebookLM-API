@@ -7,11 +7,47 @@ Automate Google NotebookLM with a small FastAPI service and Playwright. Upload s
 ## Key Features
 - Upload multiple source types (URL, YouTube, text) into a notebook via REST.
 - Trigger Audio Overview generation with optional style and prompt overrides.
+- **Video Overview generation** - Trigger, poll, and download MP4 video overviews via REST.
 - Track generation status and fetch download URLs or the binary audio file.
 - Handles English and Hebrew NotebookLM interfaces automatically.
 - Can auto-launch Chrome with a dedicated profile or attach to an existing debug session.
 - **Auto-login via cookies.txt** - Import cookies from browser extension for automated login.
 - **Docker support** - Lightweight container that connects to external browserless/chrome.
+
+---
+
+## API Endpoints
+
+### Audio Overviews
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/audio/generate` | Trigger Audio Overview generation |
+| GET | `/audio/status/{job_id}` | Poll generation status |
+| GET | `/audio/download/{job_id}` | Download finished audio file |
+
+### Video Overviews
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/video/generate` | Trigger Video Overview generation |
+| GET | `/video/status/{job_id}` | Poll generation status |
+| GET | `/video/download/{job_id}` | Download finished MP4 |
+
+**Example:**
+
+```bash
+# 1. Start generation (language is optional)
+curl -X POST http://localhost:8000/video/generate \n  -H "Content-Type: application/json" \n  -d '{"language": "Español (Latinoamérica)"}'
+# → {"job_id": "1708531200000", "status": "started"}
+
+# 2. Poll until completed (can take several minutes)
+curl http://localhost:8000/video/status/1708531200000
+# → {"job_id": "...", "status": "completed", "title": "Video overview"}
+
+# 3. Download the MP4
+curl -o overview.mp4 http://localhost:8000/video/download/1708531200000
+```
 
 ---
 
